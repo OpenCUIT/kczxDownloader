@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         云上成信文档下载助手
-// @namespace    https://github.com/igugyj
+// @namespace    https://github.com/PfolgCodeDump/kczxDownloader
 // @version      1.0.0
 // @description  抓取云上成信课程中用ONLYOFFIC渲染的文件并提供下载选项
 // @match        https://kczx.cuit.edu.cn/*
-// @homepageURL  https://github.com/igugyj/kczxDownloader
+// @homepageURL  https://github.com/PfolgCodeDump/kczxDownloader/kczxDownloader
 // @run-at       document-start
 // @author       Pfolg, DeepSeek
 // @license      MIT
