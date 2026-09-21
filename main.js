@@ -1,0 +1,439 @@
+// ==UserScript==
+// @name         云上成信文档下载助手
+// @namespace    https://github.com/igugyj
+// @version      1.0.0
+// @description  抓取云上成信课程中用ONLYOFFIC渲染的文件并提供下载选项
+// @match        https://kczx.cuit.edu.cn/*
+// @homepageURL  https://github.com/igugyj/kczxDownloader
+// @run-at       document-start
+// @author       Pfolg, DeepSeek
+// @license      MIT
+// @icon         https://kczx.cuit.edu.cn/bucket-k/imagedata/User/2022/01/8a97000e8b78452f9ad2c843e6a0e112.png
+// @grant        none
+// ==/UserScript==
+
+(function () {
+  "use strict";
+
+  const IS_TOP = window.top === window.self;
+  const TAG = IS_TOP ? "[KCZX/TOP]" : "[KCZX/IFRAME]";
+  const log = function () {
+    try {
+      console.log("%c" + TAG, "color:#2c7be5;font-weight:bold", ...arguments);
+    } catch (e) {}
+  };
+
+  // ============================================================
+  // 通用工具
+  // ============================================================
+
+  // 判断是否为可下载的文档请求
+  function matchDoc(rawUrl) {
+    if (typeof rawUrl !== "string" || !rawUrl) return null;
+    if (rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) return null;
+    let abs;
+    try {
+      abs = new URL(rawUrl, location.href).href;
+    } catch (e) {
+      return null;
+    }
+    if (!abs.startsWith(location.origin)) return null;
+    if (/\/documentserver\/cache\/files\//i.test(abs) && /[?&]md5=/i.test(abs))
+      return abs;
+    if (
+      /\.(pdf|docx?|pptx?|xlsx?|xlsm|pptm|dotx|odt|ods|odp|txt|rtf)(\?|#|$)/i.test(
+        abs,
+      )
+    )
+      return abs;
+    return null;
+  }
+
+  // 从 learning-note-service 请求里提取真实文件名
+  function extractRealName(rawUrl) {
+    if (typeof rawUrl !== "string" || !rawUrl) return "";
+    try {
+      const u = new URL(rawUrl, location.href);
+      if (!/\/edudatacenter\/v1\/learning-note-service\/get/i.test(u.pathname))
+        return "";
+      const rn = u.searchParams.get("resourceName") || "";
+      const sn = u.searchParams.get("sectionName") || "";
+      const pick = rn || sn;
+      return pick ? decodeURIComponent(pick) : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function getKey(url) {
+    try {
+      return new URL(url).pathname;
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function getFileName(url) {
+    try {
+      const u = new URL(url);
+      const fn = u.searchParams.get("filename");
+      if (fn) return decodeURIComponent(fn);
+      const last = u.pathname.split("/").filter(Boolean).pop();
+      return last ? decodeURIComponent(last) : "document";
+    } catch (e) {
+      return "document";
+    }
+  }
+
+  // ============================================================
+  // 统一的网络拦截工具：hook XHR + fetch，回调收到的每个 URL
+  // ============================================================
+
+  function hookNetwork(onUrl) {
+    try {
+      const origOpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        try {
+          onUrl(url);
+        } catch (e) {}
+        return origOpen.apply(this, arguments);
+      };
+    } catch (e) {}
+
+    try {
+      if (typeof window.fetch === "function") {
+        const origFetch = window.fetch;
+        window.fetch = function (input) {
+          try {
+            const u =
+              typeof input === "string" ? input : (input && input.url) || "";
+            onUrl(u);
+          } catch (e) {}
+          return origFetch.apply(this, arguments);
+        };
+      }
+    } catch (e) {}
+  }
+
+  // ============================================================
+  // iframe 侧：只上报文档 URL，不做 UI
+  // ============================================================
+
+  if (!IS_TOP) {
+    // 尝试从 ONLYOFFICE 编辑器配置读取真实文件名（备用）
+    function readEditorConfigName() {
+      try {
+        const de = window.docEditor;
+        if (!de || !de.config || !de.config.document) return "";
+        return de.config.document.title || "";
+      } catch (e) {
+        return "";
+      }
+    }
+
+    let lastDocUrl = "";
+
+    function report(rawUrl) {
+      const hit = matchDoc(rawUrl);
+      if (!hit) return;
+      lastDocUrl = hit;
+
+      // 优先用编辑器配置里的 title，取不到就先用 URL 里的 filename 占位
+      const editorName = readEditorConfigName();
+      const displayName = editorName || getFileName(hit);
+
+      try {
+        window.top.postMessage(
+          {
+            __kczx_doc__: true,
+            url: hit,
+            name: displayName,
+            key: getKey(hit),
+          },
+          location.origin,
+        );
+      } catch (e) {}
+    }
+
+    hookNetwork(report);
+
+    // 监听 DOM 中新出现的 iframe/embed/a/object/source
+    try {
+      new MutationObserver(function (muts) {
+        for (const m of muts) {
+          if (!m.addedNodes) continue;
+          for (const n of m.addedNodes) {
+            if (!(n instanceof Element)) continue;
+            const src =
+              n.getAttribute &&
+              (n.getAttribute("src") ||
+                n.getAttribute("data") ||
+                n.getAttribute("href"));
+            if (src) report(src);
+          }
+        }
+      }).observe(document.documentElement || document, {
+        childList: true,
+        subtree: true,
+      });
+    } catch (e) {}
+
+    // 兜底：docEditor 挂载晚于网络请求，配置就绪后补报一次真实名
+    let lastReportedName = "";
+    setInterval(function () {
+      if (!lastDocUrl) return;
+      const name = readEditorConfigName();
+      if (!name || name === lastReportedName) return;
+      lastReportedName = name;
+      try {
+        window.top.postMessage(
+          {
+            __kczx_doc__: true,
+            url: lastDocUrl,
+            name: name,
+            key: getKey(lastDocUrl),
+          },
+          location.origin,
+        );
+      } catch (e) {}
+    }, 1000);
+
+    log("iframe 侧已就绪");
+    return;
+  }
+
+  // ============================================================
+  // 顶层：捕获真实文件名 + 接收 iframe 上报 + 渲染 UI
+  // ============================================================
+
+  if (document.getElementById("__kczx_doc_ui__")) return;
+
+  const docs = new Map(); // key(pathname) -> { url, name }
+  let realName = ""; // 从 learning-note-service 接口捕获到的真实文件名
+  let expanded = false;
+  let lastSig = "";
+  let ui = null;
+
+  // ---------- 顶层 hook：捕获 learning-note-service 的真实文件名 ----------
+  hookNetwork(function (url) {
+    const name = extractRealName(url);
+    if (!name) return;
+    if (name === realName) return;
+
+    realName = name;
+    log("捕获真实文件名:", realName);
+
+    // 已收集的文档全部更新成真实名
+    let changed = false;
+    docs.forEach(function (v) {
+      if (v.name !== realName) {
+        v.name = realName;
+        changed = true;
+      }
+    });
+    if (changed) render(true);
+  });
+
+  // ---------- 路由变化时清空 ----------
+  function clearDocs() {
+    if (docs.size === 0 && !realName) return;
+    docs.clear();
+    realName = "";
+    expanded = false;
+    log("路由变化，已清空文档列表");
+    render(true);
+  }
+
+  ["pushState", "replaceState"].forEach(function (name) {
+    const orig = history[name];
+    if (typeof orig === "function") {
+      history[name] = function () {
+        const ret = orig.apply(this, arguments);
+        setTimeout(clearDocs, 0);
+        return ret;
+      };
+    }
+  });
+  window.addEventListener("popstate", clearDocs);
+  window.addEventListener("hashchange", clearDocs);
+
+  // ---------- 接收 iframe 上报 ----------
+  window.addEventListener("message", function (e) {
+    if (e.origin !== location.origin) return;
+    const d = e.data;
+    if (!d || !d.__kczx_doc__ || !d.url) return;
+    // 顶层已有真实名则优先，否则用 iframe 传来的名字
+    const name = realName || d.name;
+    upsert(d.key || getKey(d.url), d.url, name);
+  });
+
+  // ---------- 顶层 DOM 扫描（少数页面把链接直接放在 <a> 上） ----------
+  try {
+    new MutationObserver(function (muts) {
+      for (const m of muts) {
+        if (!m.addedNodes) continue;
+        for (const n of m.addedNodes) {
+          if (!(n instanceof Element)) continue;
+          const src =
+            n.getAttribute &&
+            (n.getAttribute("src") ||
+              n.getAttribute("data") ||
+              n.getAttribute("href"));
+          if (!src) continue;
+          const hit = matchDoc(src);
+          if (hit) upsert(getKey(hit), hit, realName || getFileName(hit));
+        }
+      }
+    }).observe(document.documentElement || document, {
+      childList: true,
+      subtree: true,
+    });
+  } catch (e) {}
+
+  function upsert(key, url, name) {
+    const prev = docs.get(key);
+    if (prev && prev.url === url && prev.name === name) return;
+    docs.set(key, { url: url, name: name });
+    log("加入/更新文档:", key, "->", name);
+    render();
+  }
+
+  // ============================================================
+  // 图标
+  // ============================================================
+
+  const SVG_DL =
+    '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px;"><path d="M8 2v8"/><path d="M5 7l3 3 3-3"/><path d="M3 13h10"/></svg>';
+  const SVG_DOC =
+    '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px;"><path d="M4 2h5l3 3v9H4z"/><path d="M9 2v3h3"/></svg>';
+  const SVG_CHEV_DOWN =
+    '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:6px;"><path d="M4 6l4 4 4-4"/></svg>';
+  const SVG_CHEV_UP =
+    '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:6px;"><path d="M4 10l4-4 4 4"/></svg>';
+
+  // ============================================================
+  // UI
+  // ============================================================
+
+  function ensureUI() {
+    if (ui && ui.parentNode) return ui;
+    ui = document.createElement("div");
+    ui.id = "__kczx_doc_ui__";
+    ui.style.cssText =
+      "position:fixed;right:20px;bottom:20px;z-index:2147483647;" +
+      "display:none;" +
+      'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;' +
+      "font-size:13px;color:#fff;";
+    const parent = document.body || document.documentElement;
+    if (!parent) return null;
+    parent.appendChild(ui);
+    return ui;
+  }
+
+  function render(force) {
+    const u = ensureUI();
+    if (!u) {
+      setTimeout(function () {
+        render(force);
+      }, 100);
+      return;
+    }
+
+    const list = Array.from(docs.entries()).map(function (kv) {
+      return { key: kv[0], url: kv[1].url, name: kv[1].name };
+    });
+    const sig = JSON.stringify({ list: list, expanded: expanded });
+    if (!force && sig === lastSig) return;
+    lastSig = sig;
+
+    if (!list.length) {
+      u.style.display = "none";
+      u.innerHTML = "";
+      return;
+    }
+    u.style.display = "block";
+
+    const parts = [];
+
+    // 展开列表：绝对定位在标题上方
+    if (expanded) {
+      parts.push(
+        '<div id="kczx-body" style="position:absolute;bottom:100%;right:0;' +
+          'margin-bottom:8px;display:flex;flex-direction:column;align-items:flex-end;">',
+      );
+      list.forEach(function (item) {
+        parts.push(
+          '<a class="kczx-dl" href="' +
+            item.url.replace(/"/g, "&quot;") +
+            '" ' +
+            'target="_blank" rel="noopener" ' +
+            'style="display:block;margin-top:6px;padding:8px 12px;background:#2c7be5;' +
+            "color:#fff;border-radius:6px;text-decoration:none;" +
+            "box-shadow:0 2px 8px rgba(0,0,0,.25);word-break:break-all;text-align:left;" +
+            'font-size:12px;line-height:1.4;max-width:280px;box-sizing:border-box;">' +
+            SVG_DL +
+            item.name +
+            "</a>",
+        );
+      });
+      parts.push("</div>");
+    }
+
+    // 标题：贴在右下角，位置固定不动
+    parts.push(
+      '<div id="kczx-head" style="display:inline-flex;align-items:center;' +
+        "background:rgba(0,0,0,.78);padding:8px 12px;border-radius:6px;cursor:pointer;" +
+        'font-size:12px;user-select:none;box-sizing:border-box;white-space:nowrap;">' +
+        "<span>" +
+        SVG_DOC +
+        "可下载文档 (" +
+        list.length +
+        ")</span>" +
+        "<span>" +
+        (expanded ? SVG_CHEV_DOWN : SVG_CHEV_UP) +
+        "</span>" +
+        "</div>",
+    );
+
+    u.innerHTML = parts.join("");
+
+    const head = u.querySelector("#kczx-head");
+    if (head) {
+      head.addEventListener("click", function () {
+        expanded = !expanded;
+        render(true);
+      });
+      head.addEventListener("mouseenter", function () {
+        head.style.background = "rgba(0,0,0,.9)";
+      });
+      head.addEventListener("mouseleave", function () {
+        head.style.background = "rgba(0,0,0,.78)";
+      });
+    }
+    u.querySelectorAll(".kczx-dl").forEach(function (a) {
+      a.addEventListener("mouseenter", function () {
+        a.style.background = "#1b5fbd";
+      });
+      a.addEventListener("mouseleave", function () {
+        a.style.background = "#2c7be5";
+      });
+    });
+  }
+
+  const old = document.getElementById("__kczx_doc_ui__");
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+
+  (function attach() {
+    if (!document.body && !document.documentElement) {
+      setTimeout(attach, 100);
+      return;
+    }
+    if (!ensureUI()) {
+      setTimeout(attach, 100);
+      return;
+    }
+    render(true);
+  })();
+
+  log("顶层已就绪");
+})();
