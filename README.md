@@ -5,8 +5,7 @@
 ## 安装
 
 1. 安装用户脚本管理器：Tampermonkey（Chrome / Edge / Firefox）、Violentmonkey（Firefox）或 Userscripts（Safari）。
-2. 打开安装链接：
-   <https://github.com/PfolgCodeDump/kczxDownloader/raw/main/main.js>
+2. 打开安装链接：[GitHub](https://raw.githubusercontent.com/PfolgCodeDump/kczxDownloader/main/main.js) | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/596806-%E4%BA%91%E4%B8%8A%E6%88%90%E4%BF%A1%E6%96%87%E6%A1%A3%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B)
 3. 打开任意云上成信课程页面，脚本自动生效。
 
 ## 使用
