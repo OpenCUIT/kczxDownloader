@@ -2,10 +2,17 @@
 
 一个用于云上成信平台（kczx.cuit.edu.cn）的用户脚本。自动识别课程中用 ONLYOFFICE 渲染的 PDF / Word / PPT / Excel 等文件，在页面右下角提供下载入口。
 
+## 预览
+
+<div style="display: flex; overflow-x: auto; gap: 10px; padding: 10px; background: #f5f5f5; border-radius: 8px;">
+<img src="screenshots/image.png" alt="preview1" style="width: 49%; height: auto; flex-shrink: 0; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+<img src="screenshots/image-1.png" alt="preview2" style="width: 49%; height: auto; flex-shrink: 0; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+</div>
+
 ## 安装
 
 1. 安装用户脚本管理器：Tampermonkey（Chrome / Edge / Firefox）、Violentmonkey（Firefox）或 Userscripts（Safari）。
-2. 打开安装链接：[GitHub](https://raw.githubusercontent.com/PfolgCodeDump/kczxDownloader/main/main.js) | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/596806-%E4%BA%91%E4%B8%8A%E6%88%90%E4%BF%A1%E6%96%87%E6%A1%A3%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B)
+2. 打开安装链接：[GitHub](https://raw.githubusercontent.com/OpenCUIT/kczxDownloader/main/main.js) | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/596806-%E4%BA%91%E4%B8%8A%E6%88%90%E4%BF%A1%E6%96%87%E6%A1%A3%E4%B8%8B%E8%BD%BD%E5%8A%A9%E6%89%8B)
 3. 打开任意云上成信课程页面，脚本自动生效。
 
 ## 使用
