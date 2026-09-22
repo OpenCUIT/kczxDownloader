@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         云上成信文档下载助手
 // @namespace    https://github.com/PfolgCodeDump/kczxDownloader
-// @version      1.1.0
+// @version      1.1.1
 // @description  抓取云上成信课程中用ONLYOFFICE渲染的文件并提供下载选项
 // @match        https://kczx.cuit.edu.cn/*
 // @match        http://kczx-cuit-edu-cn-s.webvpn.cuit.edu.cn:8118/*
