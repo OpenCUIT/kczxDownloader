@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         云上成信文档下载助手
-// @namespace    https://github.com/PfolgCodeDump/kczxDownloader
+// @namespace    https://github.com/OpenCUIT/kczxDownloader
 // @version      1.1.1
 // @description  抓取云上成信课程中用ONLYOFFICE渲染的文件并提供下载选项
 // @match        https://kczx.cuit.edu.cn/*
@@ -8,7 +8,7 @@
 // @match        https://kczx-cuit-edu-cn-s.webvpn.cuit.edu.cn:8118/*
 // @match        http://*.webvpn.cuit.edu.cn/*
 // @run-at       document-end
-// @homepageURL  https://github.com/PfolgCodeDump/kczxDownloader/kczxDownloader
+// @homepageURL  https://github.com/OpenCUIT/kczxDownloader
 // @author       Pfolg, DeepSeek
 // @license      MIT
 // @icon         https://kczx.cuit.edu.cn/bucket-k/imagedata/User/2022/01/8a97000e8b78452f9ad2c843e6a0e112.png
